@@ -1,16 +1,22 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import Appointment from '../models/Appointment';
 import Professional from '../models/Professional';
 import mongoose from 'mongoose';
+import { AuthRequest } from '../middleware/auth';
 
-export const getProfessionalReports = async (req: Request, res: Response): Promise<void> => {
+export const getProfessionalReports = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { start, end } = req.query as Record<string, string>;
+    const companyId = req.user?.companyId;
 
-    const dateFilter: Record<string, string> = {};
-    if (start) dateFilter.$gte = start;
-    if (end) dateFilter.$lte = end;
-    const matchStage = (start || end) ? { date: dateFilter } : {};
+    const matchStage: Record<string, unknown> = {};
+    if (companyId) matchStage.companyId = companyId;
+    if (start || end) {
+      const dateFilter: Record<string, string> = {};
+      if (start) dateFilter.$gte = start;
+      if (end) dateFilter.$lte = end;
+      matchStage.date = dateFilter;
+    }
 
     // Agregar por profesional y estado
     const pipeline: mongoose.PipelineStage[] = [
@@ -138,7 +144,9 @@ export const getProfessionalReports = async (req: Request, res: Response): Promi
     });
 
     // Agregar profesionales sin reservas
-    const allProfessionals = await Professional.find({ active: true });
+    const profFilter: Record<string, unknown> = { active: true };
+    if (companyId) profFilter.companyId = companyId;
+    const allProfessionals = await Professional.find(profFilter);
     const withStats = new Set(rawStats.map((s) => String(s._id)));
     const noStats = allProfessionals
       .filter((p) => !withStats.has(String(p._id)))

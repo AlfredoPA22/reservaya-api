@@ -65,7 +65,10 @@ export const getAppointments = async (req: AuthRequest, res: Response): Promise<
 
 export const getAppointmentById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const appointment = await Appointment.findById(req.params.id)
+    const filter: Record<string, unknown> = { _id: req.params.id };
+    if (req.user?.companyId) filter.companyId = req.user.companyId;
+    else if (req.user?.role !== 'admin') filter.clientId = req.user?.id;
+    const appointment = await Appointment.findOne(filter)
       .populate('professionalId', 'name specialty avatar')
       .populate('serviceId', 'name price duration')
       .populate('clientId', 'name email phone');
@@ -100,7 +103,9 @@ export const updateAppointmentStatus = async (req: AuthRequest, res: Response): 
 
 export const cancelAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const appointment = await Appointment.findById(req.params.id);
+    const filter: Record<string, unknown> = { _id: req.params.id };
+    if (req.user?.companyId) filter.companyId = req.user.companyId;
+    const appointment = await Appointment.findOne(filter);
     if (!appointment) { res.status(404).json({ message: 'Reserva no encontrada' }); return; }
 
     if (req.user?.role !== 'admin' && String(appointment.clientId) !== req.user?.id) {
